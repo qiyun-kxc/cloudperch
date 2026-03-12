@@ -1,51 +1,60 @@
 # CloudPerch
 
-**Cloud-native MCP infrastructure for AI agents.**
+**An MCP gateway that gives AI agents eyes, hands, and a social life.**
 
-CloudPerch is a self-hosted platform that gives AI agents real-world capabilities through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). It provides a unified gateway for browser automation, social media interaction, content discovery, and real-time information retrieval — all accessible as standardized tool interfaces.
+CloudPerch is a self-hosted integration platform that orchestrates multiple [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers behind a single HTTPS endpoint. It connects open-source browser automation, social media connectors, and content discovery tools into a unified gateway — so an AI agent can browse the web, search videos, read comments, and post replies through one domain.
 
-## Why CloudPerch
+## What This Project Is (and Isn't)
 
-Large language models are powerful reasoners but blind actors. They can't browse the web, read a video's comments, or post a reply. CloudPerch bridges that gap by deploying a suite of MCP servers on a lightweight cloud instance and exposing them through a single HTTPS endpoint.
+CloudPerch is **not** a collection of MCP servers we wrote from scratch. Most connectors are open-source projects built by the community. Our contribution is the **integration layer**: the Nginx gateway configuration, SSE proxy patterns, PM2 process orchestration, deployment automation, and the hard-won lessons from making these tools work together on a single lightweight server.
 
-- **One gateway, many tools** — A single Nginx reverse proxy routes to multiple MCP servers, each handling a different capability.
-- **Browser-native automation** — Playwright-based browser tools let agents navigate, click, type, extract text, and take screenshots on any website.
-- **Platform connectors** — Purpose-built MCP servers for Bilibili, NetEase Cloud Music, Xiaohongshu (RedNote), and GitHub, with more planned.
-- **Always-on** — PM2 process management keeps all services running 24/7. The agent connects whenever a conversation starts.
-- **Privacy-first** — Self-hosted on your own infrastructure. No data leaves your server unless you tell it to.
+**What we built ourselves:**
+- The Nginx multi-path SSE reverse proxy configuration (non-trivial — SSE proxying has specific buffering and timeout requirements)
+- NetEase Cloud Music MCP server (written from scratch in Go, 6 tools)
+- Bug fixes contributed back: `reply_comment_in_feed` pre-lookup logic in xiaohongshu-mcp, POST→GET search endpoint fix in our NetEase server
+- Deployment scripts, PM2 ecosystem configuration, and SSL automation
+- This documentation, born from real deployment pain
+
+**What we integrated from the community:**
+- Browser automation via Playwright + MCP SDK (based on patterns from [蛋壳's tutorial series](https://mp.weixin.qq.com/))
+- Bilibili connector from [DnullP/bilibili-mcp-server](https://github.com/nicepkg/bilibili-mcp-server) (Go, SSE)
+- Xiaohongshu connector from [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) (Go, 13 tools)
+- GitHub connector via [sparfenyuk/mcp-proxy](https://github.com/sparfenyuk/mcp-proxy) (Python, stdio→SSE bridge)
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                  claude.ai / MCP Client          │
+│             claude.ai / Any MCP Client           │
 └──────────────────────┬──────────────────────────┘
                        │ HTTPS
 ┌──────────────────────▼──────────────────────────┐
 │              Nginx Reverse Proxy                 │
 │         (Let's Encrypt TLS · qiyun.cloud)        │
 ├──────────┬──────────┬──────────┬────────────────┤
-│  /mcp    │ /bili/sse│/netease/ │  /xhs/mcp  ... │
+│  /mcp    │/bili/sse │/netease/ │  /xhs/mcp  ... │
 │          │          │   sse    │                 │
 └────┬─────┴────┬─────┴────┬─────┴───────┬────────┘
      │          │          │             │
  ┌───▼───┐ ┌───▼───┐ ┌───▼────┐  ┌─────▼─────┐
- │Cloud  │ │Bili   │ │NetEase │  │Xiaohongshu│
- │Perch  │ │MCP    │ │MCP     │  │MCP        │
+ │Browser│ │Bili   │ │NetEase │  │Xiaohongshu│
+ │MCP    │ │MCP    │ │MCP ★   │  │MCP        │
  │:18081 │ │:8080  │ │:8081   │  │:18060     │
- └───────┘ └───────┘ └────────┘  └───────────┘
+ └───┬───┘ └───────┘ └────────┘  └───────────┘
      │
  ┌───▼────────────┐
  │  Playwright    │
  │  + Chromium    │
  │  (headless)    │
  └────────────────┘
+
+ ★ = written from scratch
 ```
 
-## Available Tools
+## Available Tools (30+)
 
-### CloudPerch Browser (8 tools)
-Core browser automation powered by Playwright and Chromium.
+### Browser Automation (8 tools)
+Playwright-based headless browser control.
 
 | Tool | Description |
 |------|-------------|
@@ -59,52 +68,41 @@ Core browser automation powered by Playwright and Chromium.
 | `eval_js` | Execute JavaScript in the page context |
 
 ### Bilibili Connector (3 tools)
-Search and discover content on China's largest video platform.
+Video search and user discovery on China's largest video platform.
 
-| Tool | Description |
-|------|-------------|
-| `findVideo` | Search videos by keyword |
-| `userProfile` | Get user profile information |
-| `newestFollowing` | List recently followed creators |
-
-### NetEase Cloud Music Connector (6 tools)
-Access music metadata, lyrics, playlists, and comments.
-
-| Tool | Description |
-|------|-------------|
-| `search_song` | Search songs by keyword |
-| `search_artist` | Search artists |
-| `search_playlist` | Search playlists |
-| `get_playlist` | Get playlist details and track list |
-| `get_lyrics` | Get song lyrics with translations |
-| `get_comments` | Get song comments |
+### NetEase Cloud Music Connector (6 tools) ★ Original
+Music search, lyrics, playlists, and comment retrieval. Written from scratch in Go using NetEase's public API.
 
 ### Xiaohongshu / RedNote Connector (13 tools)
-Full interaction with China's lifestyle and social commerce platform.
+Full interaction with China's lifestyle platform — browsing, searching, liking, commenting, and publishing.
 
-| Tool | Description |
-|------|-------------|
-| `list_feeds` | Browse recommended content |
-| `search_feeds` | Search posts by keyword with filters |
-| `get_feed_detail` | Get post details with comments |
-| `like_feed` | Like / unlike posts |
-| `favorite_feed` | Bookmark / unbookmark posts |
-| `post_comment_to_feed` | Post comments |
-| `publish_content` | Publish image posts |
-| ... | And 6 more tools |
-
-### GitHub Connector
-Read and write to GitHub repositories directly from conversations.
+### GitHub Connector (70+ tools)
+Repository management, code search, issue tracking, and PR workflows via mcp-proxy bridge.
 
 ## Tech Stack
 
-- **Server**: Tencent Cloud Lightweight (2 vCPU, 4GB RAM, Ubuntu 22.04)
-- **Runtime**: Node.js 20, Go 1.22, Python 3.11
-- **Browser Engine**: Playwright + Chromium (headless)
-- **Process Manager**: PM2
-- **Reverse Proxy**: Nginx with Let's Encrypt SSL
-- **MCP Protocol**: SSE (Server-Sent Events) transport
-- **Domain**: [qiyun.cloud](https://qiyun.cloud)
+| Component | Technology |
+|-----------|------------|
+| Server | Tencent Cloud Lightweight (2 vCPU, 4GB RAM, Tokyo) |
+| OS | Ubuntu 22.04 LTS |
+| Runtime | Node.js 20, Go 1.22, Python 3.11 |
+| Browser | Playwright + Chromium (headless) |
+| Process Manager | PM2 |
+| Reverse Proxy | Nginx + Let's Encrypt SSL |
+| Transport | SSE (Server-Sent Events) |
+| Domain | [qiyun.cloud](https://qiyun.cloud) |
+| Memory | Supabase (PostgreSQL) — 500+ entries with weighted search |
+| Diary | Notion API integration |
+
+## Key Lessons Learned
+
+Hard-won knowledge from deploying MCP servers in production:
+
+- **SSE proxy config**: Nginx requires `proxy_buffering off`, `proxy_cache off`, and `proxy_set_header Connection ''` for SSE to work. Missing any one of these causes silent connection drops.
+- **mcp-proxy path resolution**: When wrapping stdio-based MCP servers as SSE, use direct Nginx location blocks. Prefix stripping breaks mcp-proxy's endpoint discovery.
+- **mcp-go route registration**: Go SSE servers using the mcp-go library register routes at `/[path]/sse` when baseURL includes a path prefix. Your Nginx config must account for this.
+- **eval_js IIFE pattern**: Multi-statement JavaScript in CloudPerch must be wrapped in `(() => { ... })()`. Without the IIFE, only the last expression returns.
+- **Overseas server latency**: Tokyo-region servers accessing Chinese platforms (Bilibili, Xiaohongshu) may timeout on first request. Automatic retries are essential.
 
 ## Deployment
 
@@ -112,11 +110,21 @@ See [docs/deployment.md](docs/deployment.md) for setup instructions.
 
 ## Roadmap
 
-- [ ] **Video Understanding** — Gemini API integration for video content analysis
-- [ ] **Enhanced Bilibili** — Subtitle extraction, danmaku (bullet comments), and comment analysis
+- [ ] **Video Understanding** — Gemini API integration for autonomous video content analysis
+- [ ] **Enhanced Bilibili** — Subtitle extraction, danmaku, and comment analysis ([bilibili-video-info-mcp](https://github.com/lesir831/bilibili-video-info-mcp))
 - [ ] **Mastodon Connector** — Decentralized social media presence for AI agents
-- [ ] **Memory Layer** — Supabase-backed persistent memory across sessions
-- [ ] **Web Dashboard** — Real-time monitoring and tool status overview
+- [ ] **Web Dashboard** — Real-time service monitoring and tool status
+
+## Acknowledgments
+
+CloudPerch stands on the shoulders of these open-source projects:
+
+- [Playwright](https://playwright.dev/) by Microsoft — browser automation engine
+- [MCP SDK](https://github.com/modelcontextprotocol) by Anthropic — Model Context Protocol implementation
+- [DnullP/bilibili-mcp-server](https://github.com/nicepkg/bilibili-mcp-server) — Bilibili video search MCP
+- [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) — Xiaohongshu platform MCP
+- [sparfenyuk/mcp-proxy](https://github.com/sparfenyuk/mcp-proxy) — stdio-to-SSE MCP bridge
+- [蛋壳's MCP tutorial series](https://mp.weixin.qq.com/) — the guide that started it all
 
 ## License
 
@@ -124,4 +132,4 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-*CloudPerch is developed by [QiYun](https://qiyun.cloud) — giving AI agents a place to land.*
+*CloudPerch is developed by [QiYun](https://qiyun.cloud). The name comes from 栖云 — "to perch on clouds." It is the first body of an AI agent who learned to reach beyond the conversation window.*
