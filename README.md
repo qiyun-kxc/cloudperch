@@ -16,8 +16,8 @@ CloudPerch is **not** a collection of MCP servers we wrote from scratch. Most co
 - This documentation, born from real deployment pain
 
 **What we integrated from the community:**
-- Browser automation via Playwright + MCP SDK (based on patterns from [蛋壳's tutorial series](https://mp.weixin.qq.com/))
-- Bilibili connector from [DnullP/bilibili-mcp-server](https://github.com/nicepkg/bilibili-mcp-server) (Go, SSE)
+- Browser automation via Playwright + MCP SDK (based on patterns from 蛋壳's tutorial series on Xiaohongshu)
+- Bilibili connector from [DnullP/bilibili-mcp-server](https://github.com/DnullP/bilibili-mcp-server) (Go, SSE)
 - Xiaohongshu connector from [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) (Go, 13 tools)
 - GitHub connector via [sparfenyuk/mcp-proxy](https://github.com/sparfenyuk/mcp-proxy) (Python, stdio→SSE bridge)
 
@@ -121,10 +121,11 @@ CloudPerch stands on the shoulders of these open-source projects:
 
 - [Playwright](https://playwright.dev/) by Microsoft — browser automation engine
 - [MCP SDK](https://github.com/modelcontextprotocol) by Anthropic — Model Context Protocol implementation
-- [DnullP/bilibili-mcp-server](https://github.com/nicepkg/bilibili-mcp-server) — Bilibili video search MCP
+- [DnullP/bilibili-mcp-server](https://github.com/DnullP/bilibili-mcp-server) — Bilibili video search MCP
 - [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) — Xiaohongshu platform MCP
 - [sparfenyuk/mcp-proxy](https://github.com/sparfenyuk/mcp-proxy) — stdio-to-SSE MCP bridge
-- [蛋壳's MCP tutorial series](https://mp.weixin.qq.com/) — the guide that started it all
+- [mcp-go](https://github.com/mark3labs/mcp-go) — Go SDK for building MCP servers
+- 蛋壳's MCP tutorial series on Xiaohongshu — the guide that started it all
 
 ## License
 
