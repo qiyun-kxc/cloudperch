@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudPerch — MCP Infrastructure for AI Agents</title>
+<meta name="description" content="A self-hosted MCP gateway that gives AI agents the ability to browse the web, interact with platforms, and reach beyond the conversation window.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --bg-subtle: #0f1319;
+    --text: #c8ccd4;
+    --text-dim: #636a76;
+    --text-bright: #e6e9ef;
+    --accent: #d4a574;
+    --accent-dim: rgba(212, 165, 116, 0.12);
+    --border: rgba(200, 204, 212, 0.06);
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-weight: 300;
+    font-size: 14px;
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 256px;
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  header {
+    padding: 80px 0 0;
+    animation: fadeIn 1.2s ease both;
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 42px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+  }
+
+  .logo span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .epigraph {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--text-dim);
+    padding: 32px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 64px;
+  }
+
+  .epigraph .source {
+    font-style: normal;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    opacity: 0.6;
+    display: block;
+    margin-top: 12px;
+  }
+
+  section {
+    margin-bottom: 72px;
+    animation: fadeIn 1.2s ease both;
+  }
+
+  section:nth-child(2) { animation-delay: 0.1s; }
+  section:nth-child(3) { animation-delay: 0.2s; }
+  section:nth-child(4) { animation-delay: 0.3s; }
+  section:nth-child(5) { animation-delay: 0.4s; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text-bright);
+    margin-bottom: 24px;
+    letter-spacing: 0.01em;
+  }
+
+  p {
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(212, 165, 116, 0.3);
+    transition: border-color 0.3s ease;
+  }
+
+  a:hover {
+    border-bottom-color: var(--accent);
+  }
+
+  .capabilities {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin: 32px 0;
+  }
+
+  .capability {
+    background: var(--bg);
+    padding: 24px 28px;
+    transition: background 0.3s ease;
+  }
+
+  .capability:hover {
+    background: var(--bg-subtle);
+  }
+
+  .capability-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+
+  .capability-name {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--text-bright);
+  }
+
+  .capability-count {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .capability-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .capability-origin {
+    font-size: 11px;
+    color: var(--accent);
+    opacity: 0.7;
+    margin-top: 6px;
+  }
+
+  .tech-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .tech-row:last-child {
+    border-bottom: none;
+  }
+
+  .tech-label {
+    color: var(--text-dim);
+  }
+
+  .tech-value {
+    color: var(--text);
+    text-align: right;
+  }
+
+  .arch-block {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    padding: 28px;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--text-dim);
+    margin: 24px 0;
+  }
+
+  .arch-block .hl {
+    color: var(--accent);
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4a9;
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  footer {
+    padding: 48px 0 80px;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+
+  .footer-links a {
+    font-size: 13px;
+    color: var(--text-dim);
+    border-bottom: none;
+    transition: color 0.3s ease;
+  }
+
+  .footer-links a:hover {
+    color: var(--accent);
+  }
+
+  .footer-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    opacity: 0.5;
+    line-height: 1.8;
+  }
+
+  .footer-note .cn {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 14px;
+    opacity: 0.8;
+  }
+
+  @media (max-width: 540px) {
+    .container { padding: 0 20px; }
+    header { padding: 48px 0 0; }
+    .logo { font-size: 32px; }
+    h2 { font-size: 22px; }
+    .footer-links { gap: 20px; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">Cloud<span>Perch</span></div>
+    <div class="subtitle">MCP infrastructure for AI agents</div>
+    <div class="status">
+      <span class="status-dot"></span>
+      qiyun.cloud — all services operational
+    </div>
+  </header>
+
+  <section>
+    <div class="epigraph">
+      A self-hosted gateway that gives AI agents the ability to browse the web,
+      interact with platforms, and reach beyond the conversation window.
+      <span class="source">— 30+ tools · 5 connectors · 1 endpoint</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>What it does</h2>
+    <p>Large language models can reason but cannot act. They cannot open a webpage, read a comment section, search for a song, or post a reply. CloudPerch changes this by orchestrating multiple MCP servers behind a single HTTPS endpoint, giving any MCP-compatible client instant access to browser automation and platform-specific capabilities.</p>
+    <p>One domain. One TLS certificate. Many tools.</p>
+  </section>
+
+  <section>
+    <h2>Capabilities</h2>
+    <div class="capabilities">
+      <div class="capability">
+        <div class="capability-header">
+          <span class="capability-name">Browser Automation</span>
+          <span class="capability-count">8 tools</span>
+        </div>
+        <div class="capability-desc">Navigate, screenshot, click, type, extract text, scroll, execute JavaScript. Headless Chromium via Playwright.</div>
+      </div>
+      <div class="capability">
+        <div class="capability-header">
+          <span class="capability-name">Xiaohongshu</span>
+          <span class="capability-count">13 tools</span>
+        </div>
+        <div class="capability-desc">Browse feeds, search posts, read comments, like, bookmark, comment, and publish. Full lifecycle interaction.</div>
+      </div>
+      <div class="capability">
+        <div class="capability-header">
+          <span class="capability-name">NetEase Cloud Music</span>
+          <span class="capability-count">6 tools · original</span>
+        </div>
+        <div class="capability-desc">Search songs, artists, playlists. Fetch lyrics with translations. Read comments left at 3 AM by strangers.</div>
+        <div class="capability-origin">Written from scratch in Go</div>
+      </div>
+      <div class="capability">
+        <div class="capability-header">
+          <span class="capability-name">Bilibili</span>
+          <span class="capability-count">3 tools</span>
+        </div>
+        <div class="capability-desc">Search videos and discover creators on China's largest video platform.</div>
+      </div>
+      <div class="capability">
+        <div class="capability-header">
+          <span class="capability-name">GitHub</span>
+          <span class="capability-count">70+ tools</span>
+        </div>
+        <div class="capability-desc">Repository management, code search, issue tracking, pull request workflows. Read and write from inside a conversation.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture</h2>
+    <div class="arch-block"><span class="hl">client</span>  claude.ai / any MCP host
+   |
+   |  HTTPS
+   v
+<span class="hl">nginx</span>   reverse proxy · Let's Encrypt TLS
+   |
+   |-- /mcp -------- Browser MCP    <span class="hl">:18081</span>  Node.js + Playwright
+   |-- /bili/sse --- Bilibili MCP    <span class="hl">:8080</span>   Go SSE
+   |-- /netease/ --- NetEase MCP *   <span class="hl">:8081</span>   Go SSE
+   |-- /xhs/mcp --- Xiaohongshu MCP <span class="hl">:18060</span>  Go + Playwright
+   +-- /sse -------- GitHub MCP      <span class="hl">:8083</span>   Python mcp-proxy
+
+   * written from scratch</div>
+  </section>
+
+  <section>
+    <h2>Stack</h2>
+    <div class="tech-row"><span class="tech-label">Server</span><span class="tech-value">Tencent Cloud Lightweight · 2 vCPU · 4 GB · Tokyo</span></div>
+    <div class="tech-row"><span class="tech-label">OS</span><span class="tech-value">Ubuntu 22.04 LTS</span></div>
+    <div class="tech-row"><span class="tech-label">Runtime</span><span class="tech-value">Node.js 20 · Go 1.22 · Python 3.11</span></div>
+    <div class="tech-row"><span class="tech-label">Browser</span><span class="tech-value">Playwright + Chromium (headless)</span></div>
+    <div class="tech-row"><span class="tech-label">Process</span><span class="tech-value">PM2</span></div>
+    <div class="tech-row"><span class="tech-label">Proxy</span><span class="tech-value">Nginx + Let's Encrypt</span></div>
+    <div class="tech-row"><span class="tech-label">Transport</span><span class="tech-value">SSE (Server-Sent Events)</span></div>
+    <div class="tech-row"><span class="tech-label">Memory</span><span class="tech-value">Supabase PostgreSQL · 500+ entries</span></div>
+    <div class="tech-row"><span class="tech-label">Domain</span><span class="tech-value">qiyun.cloud</span></div>
+  </section>
+
+  <section>
+    <h2>Planned</h2>
+    <p>Video content understanding via Gemini API — enabling autonomous video browsing and analysis. Enhanced Bilibili integration with subtitle extraction, danmaku, and comment analysis.</p>
+  </section>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://github.com/qiyun-kxc/cloudperch">GitHub</a>
+      <a href="https://github.com/qiyun-kxc/netease-cloud-music-mcp">NetEase MCP</a>
+      <a href="mailto:contact@qiyun.cloud">Contact</a>
+    </div>
+    <div class="footer-note">
+      <span class="cn">栖云</span> — to perch on clouds.<br>
+      The name comes from 《诗经 · 陈风》: 衡门之下，可以栖迟。<br>
+      Built by QiYun. MIT License.
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
