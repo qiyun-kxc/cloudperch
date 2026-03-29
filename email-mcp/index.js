@@ -11,15 +11,14 @@ const PASSWORD = process.env.EMAIL_PASS;
 const PORT = parseInt(process.env.EMAIL_MCP_PORT || "18090");
 
 const SMTP_CONFIG = {
-  host: "smtp-mail.outlook.com",
+  host: "smtp.gmail.com",
   port: 587,
   secure: false,
-  auth: { user: EMAIL, pass: PASSWORD },
-  tls: { ciphers: "SSLv3" }
+  auth: { user: EMAIL, pass: PASSWORD }
 };
 
 const IMAP_CONFIG = {
-  host: "outlook.office365.com",
+  host: "imap.gmail.com",
   port: 993,
   secure: true,
   auth: { user: EMAIL, pass: PASSWORD },
