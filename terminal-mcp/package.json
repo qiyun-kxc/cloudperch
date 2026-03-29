@@ -1,0 +1,13 @@
+{
+  "name": "terminal-mcp-server",
+  "version": "1.0.0",
+  "description": "克栖迟的终端 MCP —— 栖云的手",
+  "type": "module",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^4.21.0",
+    "zod": "^3.23.0"
+  }
+}
