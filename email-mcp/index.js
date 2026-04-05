@@ -9,12 +9,7 @@ import { z } from "zod";
 const EMAIL = process.env.EMAIL_USER;
 const PASSWORD = process.env.EMAIL_PASS;
 const PORT = parseInt(process.env.EMAIL_MCP_PORT || "18090");
-const DISPLAY_NAME = process.env.EMAIL_DISPLAY_NAME || "Email MCP";
-
-if (!EMAIL || !PASSWORD) {
-  console.error("❌ EMAIL_USER and EMAIL_PASS must be set");
-  process.exit(1);
-}
+const SSE_MSG_PATH = process.env.SSE_MSG_PATH || "/messages";
 
 const SMTP_CONFIG = {
   host: "smtp.gmail.com",
@@ -48,7 +43,7 @@ function registerTools(s) {
       try {
         const transporter = nodemailer.createTransport(SMTP_CONFIG);
         const info = await transporter.sendMail({
-          from: `${DISPLAY_NAME} <${EMAIL}>`,
+          from: `${process.env.EMAIL_DISPLAY_NAME || EMAIL} <${EMAIL}>`,
           to,
           subject,
           text: body,
@@ -57,12 +52,12 @@ function registerTools(s) {
         return {
           content: [{
             type: "text",
-            text: `✅ Email sent\nTo: ${to}\nSubject: ${subject}\nMessageId: ${info.messageId}`
+            text: `Sent to: ${to}\nSubject: ${subject}\nMessageId: ${info.messageId}`
           }]
         };
       } catch (err) {
         return {
-          content: [{ type: "text", text: `❌ Send failed: ${err.message}` }],
+          content: [{ type: "text", text: `Send failed: ${err.message}` }],
           isError: true
         };
       }
@@ -107,9 +102,9 @@ function registerTools(s) {
           return {
             content: [{
               type: "text",
-              text: `Inbox: ${total} emails, showing ${messages.length} recent:\n\n` +
+              text: `${total} total, showing ${messages.length}:\n\n` +
                 messages.map((m, i) =>
-                  `${i + 1}. [UID:${m.uid}] ${m.seen ? "" : "🆕 "}${m.subject}\n   From: ${m.fromName} <${m.from}>\n   Date: ${m.date}`
+                  `${i + 1}. [UID:${m.uid}] ${m.seen ? "" : "NEW "}${m.subject}\n   From: ${m.fromName} <${m.from}>\n   Date: ${m.date}`
                 ).join("\n\n")
             }]
           };
@@ -118,7 +113,7 @@ function registerTools(s) {
         }
       } catch (err) {
         return {
-          content: [{ type: "text", text: `❌ List failed: ${err.message}` }],
+          content: [{ type: "text", text: `List failed: ${err.message}` }],
           isError: true
         };
       } finally {
@@ -131,7 +126,7 @@ function registerTools(s) {
     "email_read",
     {
       title: "Read Email",
-      description: "Read a specific email by UID. Use email_list to get UIDs first.",
+      description: "Read full email by UID. Use email_list to get UIDs first.",
       inputSchema: {
         uid: z.number().describe("Email UID from email_list"),
         folder: z.string().default("INBOX").describe("Mail folder, default INBOX")
@@ -151,14 +146,12 @@ function registerTools(s) {
 
           if (!msg) {
             return {
-              content: [{ type: "text", text: `❌ Email with UID ${uid} not found` }],
+              content: [{ type: "text", text: `No email with UID ${uid}` }],
               isError: true
             };
           }
 
-          // Use mailparser for correct MIME decoding (base64, quoted-printable, charset)
           const parsed = await simpleParser(msg.source);
-
           const body = parsed.text || parsed.html?.replace(/<[^>]*>/g, " ").substring(0, 5000) || "(no body)";
           const from = parsed.from?.value?.[0];
           const to = parsed.to?.value?.map(t => t.address).join(", ") || "";
@@ -166,8 +159,7 @@ function registerTools(s) {
           return {
             content: [{
               type: "text",
-              text: `📧 Email Details\n` +
-                `From: ${from?.name || ""} <${from?.address || ""}>\n` +
+              text: `From: ${from?.name || ""} <${from?.address || ""}>\n` +
                 `To: ${to}\n` +
                 `Subject: ${parsed.subject || "(no subject)"}\n` +
                 `Date: ${parsed.date?.toISOString() || ""}\n` +
@@ -179,7 +171,7 @@ function registerTools(s) {
         }
       } catch (err) {
         return {
-          content: [{ type: "text", text: `❌ Read failed: ${err.message}` }],
+          content: [{ type: "text", text: `Read failed: ${err.message}` }],
           isError: true
         };
       } finally {
@@ -197,7 +189,7 @@ function registerTools(s) {
         from: z.string().optional().describe("Sender address or name"),
         subject: z.string().optional().describe("Subject keyword"),
         keyword: z.string().optional().describe("Body keyword"),
-        since: z.string().optional().describe("Start date, format YYYY-MM-DD"),
+        since: z.string().optional().describe("Start date, YYYY-MM-DD"),
         folder: z.string().default("INBOX").describe("Folder to search")
       }
     },
@@ -238,7 +230,7 @@ function registerTools(s) {
           return {
             content: [{
               type: "text",
-              text: `Found ${uids.length} matching emails (showing ${messages.length} recent):\n\n` +
+              text: `Found ${uids.length} (showing ${messages.length}):\n\n` +
                 messages.map((m, i) =>
                   `${i + 1}. [UID:${m.uid}] ${m.subject}\n   From: ${m.fromName} <${m.from}>\n   Date: ${m.date}`
                 ).join("\n\n")
@@ -249,7 +241,7 @@ function registerTools(s) {
         }
       } catch (err) {
         return {
-          content: [{ type: "text", text: `❌ Search failed: ${err.message}` }],
+          content: [{ type: "text", text: `Search failed: ${err.message}` }],
           isError: true
         };
       } finally {
@@ -270,7 +262,7 @@ const sessions = {};
 
 app.get("/sse", async (req, res) => {
   const srv = createServer();
-  const transport = new SSEServerTransport("/terminal/messages", res);
+  const transport = new SSEServerTransport(SSE_MSG_PATH, res);
   sessions[transport.sessionId] = { transport, server: srv };
   res.on("close", () => {
     srv.close();
@@ -279,7 +271,7 @@ app.get("/sse", async (req, res) => {
   await srv.connect(transport);
 });
 
-app.post("/terminal/messages", async (req, res) => {
+app.post("/messages", async (req, res) => {
   const sessionId = req.query.sessionId;
   const entry = sessions[sessionId];
   if (!entry) {
@@ -294,8 +286,8 @@ app.get("/health", (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`📧 Email MCP v1.1 started: http://0.0.0.0:${PORT}`);
-  console.log(`   Account: ${EMAIL}`);
-  console.log(`   Display name: ${DISPLAY_NAME}`);
-  console.log(`   Tools: email_send, email_list, email_read, email_search`);
+  console.log(`Email MCP v1.1 started: http://0.0.0.0:${PORT}`);
+  console.log(`  Account: ${EMAIL}`);
+  console.log(`  SSE path: ${SSE_MSG_PATH}`);
+  console.log(`  Tools: email_send, email_list, email_read, email_search`);
 });

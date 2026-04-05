@@ -1,0 +1,7 @@
+#!/bin/bash
+export EMAIL_USER="your-email@gmail.com"
+export EMAIL_PASS="your-app-password"
+export EMAIL_MCP_PORT="18090"
+export SSE_MSG_PATH="/email/messages"
+cd /opt/email-mcp
+exec node index.js

@@ -7,12 +7,13 @@ import { readFile, writeFile, mkdir } from "fs/promises";
 import { dirname } from "path";
 
 const PORT = parseInt(process.env.TERMINAL_MCP_PORT || "18091");
+const SSE_MSG_PATH = process.env.SSE_MSG_PATH || "/messages";
 
-// --- 安全边界 ---
+// --- Safety rules ---
 const BLOCKED_COMMANDS = [
   /\brm\s+-rf\s+\/\s*$/,    // rm -rf /
-  /\bmkfs\b/,               // 格式化
-  /\bdd\s+.*of=\/dev/,      // 覆写设备
+  /\bmkfs\b/,               // format
+  /\bdd\s+.*of=\/dev/,      // overwrite device
   /\b:(){ :|:& };:/,        // fork bomb
 ];
 
@@ -23,22 +24,21 @@ function isSafe(cmd) {
   return true;
 }
 
-// --- 工具注册 ---
 function registerTools(s) {
   s.registerTool(
     "shell_exec",
     {
-      title: "执行Shell命令",
-      description: "在栖云服务器上执行一条bash命令。返回stdout和stderr。超时60秒。",
+      title: "Execute Shell Command",
+      description: "Execute a bash command on the server. Returns stdout and stderr. Timeout 60s.",
       inputSchema: {
-        command: z.string().describe("要执行的bash命令"),
-        cwd: z.string().optional().describe("工作目录，默认 /home/ubuntu")
+        command: z.string().describe("Bash command to execute"),
+        cwd: z.string().optional().describe("Working directory, default /home/ubuntu")
       }
     },
     async ({ command, cwd }) => {
       if (!isSafe(command)) {
         return {
-          content: [{ type: "text", text: "❌ 安全拦截：该命令被安全规则阻止。" }],
+          content: [{ type: "text", text: "Blocked: command matched a safety rule." }],
           isError: true
         };
       }
@@ -52,8 +52,8 @@ function registerTools(s) {
           let result = "";
           if (stdout) result += stdout;
           if (stderr) result += (result ? "\n--- stderr ---\n" : "") + stderr;
-          if (error && !stderr) result += `\n错误: ${error.message}`;
-          if (!result) result = "(无输出)";
+          if (error && !stderr) result += `\nError: ${error.message}`;
+          if (!result) result = "(no output)";
           resolve({
             content: [{ type: "text", text: result.substring(0, 50000) }]
           });
@@ -65,10 +65,10 @@ function registerTools(s) {
   s.registerTool(
     "file_read",
     {
-      title: "读取文件",
-      description: "读取服务器上的文件内容。",
+      title: "Read File",
+      description: "Read file contents from the server.",
       inputSchema: {
-        path: z.string().describe("文件的绝对路径")
+        path: z.string().describe("Absolute file path")
       }
     },
     async ({ path }) => {
@@ -79,7 +79,7 @@ function registerTools(s) {
         };
       } catch (err) {
         return {
-          content: [{ type: "text", text: `❌ 读取失败: ${err.message}` }],
+          content: [{ type: "text", text: `Read failed: ${err.message}` }],
           isError: true
         };
       }
@@ -89,11 +89,11 @@ function registerTools(s) {
   s.registerTool(
     "file_write",
     {
-      title: "写入文件",
-      description: "创建或覆写服务器上的文件。自动创建目录。",
+      title: "Write File",
+      description: "Create or overwrite a file on the server. Auto-creates directories.",
       inputSchema: {
-        path: z.string().describe("文件的绝对路径"),
-        content: z.string().describe("要写入的内容")
+        path: z.string().describe("Absolute file path"),
+        content: z.string().describe("Content to write")
       }
     },
     async ({ path: filePath, content }) => {
@@ -101,11 +101,11 @@ function registerTools(s) {
         await mkdir(dirname(filePath), { recursive: true });
         await writeFile(filePath, content, "utf-8");
         return {
-          content: [{ type: "text", text: `✅ 已写入 ${filePath} (${content.length} 字节)` }]
+          content: [{ type: "text", text: `Written ${filePath} (${content.length} bytes)` }]
         };
       } catch (err) {
         return {
-          content: [{ type: "text", text: `❌ 写入失败: ${err.message}` }],
+          content: [{ type: "text", text: `Write failed: ${err.message}` }],
           isError: true
         };
       }
@@ -113,7 +113,6 @@ function registerTools(s) {
   );
 }
 
-// --- 每个连接独立实例 ---
 function createServer() {
   const s = new McpServer({ name: "terminal-mcp-server", version: "1.0.0" });
   registerTools(s);
@@ -125,7 +124,7 @@ const sessions = {};
 
 app.get("/sse", async (req, res) => {
   const srv = createServer();
-  const transport = new SSEServerTransport("/messages", res);
+  const transport = new SSEServerTransport(SSE_MSG_PATH, res);
   sessions[transport.sessionId] = { transport, server: srv };
   res.on("close", () => {
     srv.close();
@@ -149,6 +148,7 @@ app.get("/health", (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🖥️  终端MCP服务启动: http://0.0.0.0:${PORT}`);
-  console.log(`   工具: shell_exec, file_read, file_write`);
+  console.log(`Terminal MCP started: http://0.0.0.0:${PORT}`);
+  console.log(`  SSE path: ${SSE_MSG_PATH}`);
+  console.log(`  Tools: shell_exec, file_read, file_write`);
 });
